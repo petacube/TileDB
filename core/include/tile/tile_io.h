@@ -54,6 +54,12 @@ class TileIO {
   /*                API                */
   /* ********************************* */
 
+  Status read(
+      Tile* tile,
+      uint64_t file_offset,
+      uint64_t compressed_size,
+      uint64_t tile_size);
+
   Status write(Tile* tile, uint64_t* bytes_written);
 
  private:
@@ -84,6 +90,12 @@ class TileIO {
   Status compress_tile_rle(Tile* tile, int level);
 
   Status compress_tile_bzip2(Tile* tile, int level);
+
+  Status decompress_tile(Tile* tile, uint64_t tile_size);
+
+  Status map_tile(Tile* tile, uint64_t tile_size, uint64_t offset);
+
+  Status map_tile(uint64_t tile_size, uint64_t offset);
 };
 
 }  // namespace tiledb

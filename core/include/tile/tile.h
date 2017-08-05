@@ -55,7 +55,8 @@ class Tile {
       Compressor compression,
       int compression_level,
       uint64_t tile_size,
-      uint64_t cell_size);
+      uint64_t cell_size,
+      bool stores_offsets = false);
 
   ~Tile();
 
@@ -91,9 +92,15 @@ class Tile {
     return buffer_->offset() == buffer_->size();
   }
 
+  Status mmap(int fd, uint64_t tile_size, uint64_t offset);
+
   inline void reset() {
     if (buffer_ != nullptr)
       buffer_->reset_offset();
+  }
+
+  void set_file_offset(uint64_t file_offset) {
+    file_offset_ = file_offset;
   }
 
   inline Datatype type() const {
@@ -126,6 +133,10 @@ class Tile {
   Compressor compressor_;
 
   int compression_level_;
+
+  uint64_t file_offset_;
+
+  bool stores_offsets_;
 
   uint64_t tile_size_;
 

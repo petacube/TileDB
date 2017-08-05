@@ -46,6 +46,8 @@ Tile::Tile() {
   cell_size_ = 0;
   compressor_ = Compressor::NO_COMPRESSION;
   compression_level_ = -1;
+  file_offset_ = 0; // TODO: perhaps initialize to -1
+  stores_offsets_ = false;
   tile_size_ = 0;
   type_ = Datatype::INT32;
 }
@@ -55,23 +57,36 @@ Tile::Tile(
     Compressor compressor,
     int compression_level,
     uint64_t tile_size,
-    uint64_t cell_size)
+    uint64_t cell_size,
+    bool stores_offsets)
     : cell_size_(cell_size)
     , compressor_(compressor)
     , compression_level_(compression_level)
+    , stores_offsets_(stores_offsets)
     , tile_size_(tile_size)
     , type_(type) {
   buffer_ = nullptr;
+  file_offset_ = 0; // TODO: perhaps initialize to -1
 }
 
 Tile::~Tile() {
   if (buffer_ != nullptr)
-    free(buffer_);
+    delete buffer_;
 }
 
 /* ****************************** */
 /*               API              */
 /* ****************************** */
+
+Status Tile::mmap(int fd, uint64_t tile_size, uint64_t offset) {
+  // Create new buffer
+  if (buffer_ != nullptr)
+    delete buffer_;
+  buffer_ = new Buffer();
+
+  return buffer_->mmap(fd, tile_size, offset, !stores_offsets_);
+}
+
 
 Status Tile::write(ConstBuffer* const_buffer) {
   if (buffer_ == nullptr)

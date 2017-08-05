@@ -66,7 +66,8 @@ WriteState::WriteState(const Fragment* fragment, BookKeeping* book_keeping)
   // Initialize tiles
   for (int i = 0; i < attribute_num; ++i) {
     const Attribute* attr = array_schema->Attributes()[i];
-    uint64_t cell_size = (array_schema->var_size(i)) ?
+    bool var_size =  array_schema->var_size(i);
+    uint64_t cell_size = (var_size) ?
                              array_schema->type_size(i) :
                              array_schema->cell_size(i);
     tiles_.emplace_back(new Tile(
@@ -74,13 +75,18 @@ WriteState::WriteState(const Fragment* fragment, BookKeeping* book_keeping)
         attr->compressor(),
         attr->compression_level(),
         fragment_->tile_size(i),
-        attr->cell_size()));
+        attr->cell_size()),
+        var_size);
+    if(var_size)
     tiles_var_.emplace_back(new Tile(
         attr->type(),
         attr->compressor(),
         attr->compression_level(),
         fragment_->tile_size(i),
         cell_size));
+    else
+      tiles_var_.emplace_back(nullptr);
+
   }
   const Dimension* dim = array_schema->Dimensions()[0];
   tiles_.emplace_back(new Tile(
@@ -104,7 +110,12 @@ WriteState::WriteState(const Fragment* fragment, BookKeeping* book_keeping)
 
 WriteState::~WriteState() {
   for (auto& tile : tiles_)
-    delete tile;
+    if(tile != nullptr)
+      delete tile;
+
+  for (auto& tile_var : tiles_var_)
+    if(tile_var != nullptr)
+      delete tile_var;
 
   // Free current MBR
   if (mbr_ != nullptr)

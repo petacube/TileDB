@@ -35,9 +35,11 @@
 #define TILEDB_READ_STATE_H
 
 #include <vector>
+
 #include "array.h"
 #include "book_keeping.h"
 #include "fragment.h"
+#include "tile.h"
 
 namespace tiledb {
 
@@ -339,42 +341,58 @@ class ReadState {
 
   /** The array the fragment belongs to. */
   const Array* array_;
+
   /** The array schema. */
   const ArraySchema* array_schema_;
+
   /** The number of array attributes. */
   int attribute_num_;
+
   /** The book-keeping of the fragment the read state belongs to. */
   BookKeeping* book_keeping_;
+
   /** The size of the array coordinates. */
   size_t coords_size_;
+
   /** Indicates if the read operation on this fragment finished. */
   bool done_;
+
   /** Keeps track of which tile is in main memory for each attribute. */
   std::vector<int64_t> fetched_tile_;
+
   /** The fragment the read state belongs to. */
   const Fragment* fragment_;
+
   /** Keeps track of whether each attribute is empty or not. */
   std::vector<bool> is_empty_attribute_;
+
   /**
    * Last investigated tile coordinates. Applicable only to **sparse** fragments
    * for **dense** arrays.
    */
   void* last_tile_coords_;
+
   /** A buffer for each attribute used by mmap for mapping a tile from disk. */
-  std::vector<void*> map_addr_;
+  //  std::vector<void*> map_addr_;
+
   /** The corresponding lengths of the buffers in map_addr_. */
-  std::vector<size_t> map_addr_lengths_;
+  //  std::vector<size_t> map_addr_lengths_;
+
   /** A buffer mapping a compressed tile from disk. */
-  void* map_addr_compressed_;
+  //  void* map_addr_compressed_;
+
   /** The corresponding length of the map_addr_compressed_ buffer. */
-  size_t map_addr_compressed_length_;
+  //  size_t map_addr_compressed_length_;
+
   /**
    * A buffer for each attribute used by mmap for mapping a variable tile from
    * disk.
    */
-  std::vector<void*> map_addr_var_;
+  //  std::vector<void*> map_addr_var_;
+
   /** The corresponding lengths of the buffers in map_addr_var_. */
-  std::vector<size_t> map_addr_var_lengths_;
+  //  std::vector<size_t> map_addr_var_lengths_;
+
   /**
    * The overlap between an MBR and the current tile under investigation
    * in the case of **sparse** fragments in **dense** arrays. The overlap
@@ -385,8 +403,10 @@ class ReadState {
    *    - 3: Partial overlap contig
    */
   int mbr_tile_overlap_;
+
   /** Indicates buffer overflow for each attribute. */
   std::vector<bool> overflow_;
+
   /**
    * The type of overlap of the current search tile with the query subarray
    * is full or not. It can be one of the following:
@@ -396,47 +416,66 @@ class ReadState {
    *    - 3: Partial overlap contig
    */
   int search_tile_overlap_;
+
   /** The overlap between the current search tile and the query subarray. */
   void* search_tile_overlap_subarray_;
+
   /** The positions of the currently investigated tile. */
   int64_t search_tile_pos_;
+
   /**
    * True if the fragment non-empty domain fully covers the subarray area
    * in the current overlapping tile.
    */
   bool subarray_area_covered_;
+
   /** Internal buffer used in the case of compression. */
-  void* tile_compressed_;
+  //  void* tile_compressed_;
+
   /** Allocated size for internal buffer used in the case of compression. */
-  size_t tile_compressed_allocated_size_;
+  //  size_t tile_compressed_allocated_size_;
+
   /** File offset for each attribute tile. */
-  std::vector<off_t> tiles_file_offsets_;
+  //  std::vector<off_t> tiles_file_offsets_;
+
   /** File offset for each variable-sized attribute tile. */
-  std::vector<off_t> tiles_var_file_offsets_;
+  //  std::vector<off_t> tiles_var_file_offsets_;
+
   /**
    * Local tile buffers, one per attribute, plus two for coordinates
    * (the second one is for searching).
    */
-  std::vector<void*> tiles_;
+  //  std::vector<void*> tiles_;
+
+  std::vector<Tile*> Tiles_;
+
   /** Current offsets in tiles_ (one per attribute). */
-  std::vector<size_t> tiles_offsets_;
+  //  std::vector<size_t> tiles_offsets_;
+
   /**
    * The tile position range the search for overlapping tiles with the
    * subarray query will focus on.
    */
   int64_t tile_search_range_[2];
+
   /** Sizes of tiles_ (one per attribute). */
-  std::vector<size_t> tiles_sizes_;
+  //  std::vector<size_t> tiles_sizes_;
+
   /** Local variable tile buffers (one per attribute). */
-  std::vector<void*> tiles_var_;
+  //  std::vector<void*> tiles_var_;
+
   /** Allocated sizes for the local variable tile buffers. */
-  std::vector<size_t> tiles_var_allocated_size_;
+  //  std::vector<size_t> tiles_var_allocated_size_;
+
   /** Current offsets in tiles_var_ (one per attribute). */
-  std::vector<size_t> tiles_var_offsets_;
+  //  std::vector<size_t> tiles_var_offsets_;
+
   /** Sizes of tiles_var_ (one per attribute). */
-  std::vector<size_t> tiles_var_sizes_;
+  //  std::vector<size_t> tiles_var_sizes_;
+
   /** Temporary coordinates. */
   void* tmp_coords_;
+
   /** Temporary offset. */
   size_t tmp_offset_;
 
@@ -514,25 +553,6 @@ class ReadState {
    */
   template <class T>
   void compute_tile_search_range_col_or_row();
-
-  /**
-   * Decompresses a tile.
-   *
-   * @param attribute_id The id of the attribute the tile belongs to.
-   * @param tile_compressed The compressed tile to be decompressed.
-   * @param tile_compressed_size The size of the compressed tile.
-   * @param tile The resulting decompressed tile.
-   * @param tile_size The expected size of the decompressed tile (for checking
-   *     for errors).
-   * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
-   */
-  Status decompress_tile(
-      int attribute_id,
-      uint64_t cell_size,
-      unsigned char* tile_compressed,
-      size_t tile_compressed_size,
-      unsigned char* tile,
-      size_t tile_size);
 
   /**
    * Decompresses a tile with GZIP.
@@ -705,90 +725,7 @@ class ReadState {
   /** Returns *true* if the file of the input attribute is empty. */
   bool is_empty_attribute(int attribute_id) const;
 
-  /**
-   * Maps a tile from the disk for an attribute into a local buffer, using
-   * memory map (mmap). This function works with any compression.
-   *
-   * @param attribute_id The id of the attribute the read occurs for.
-   * @param offset The offset at which the tile starts in the file.
-   * @param tile_size The tile size.
-   * @return TILEDB_RS_OK for success, and TILEDB_RS_ERR for error.
-   */
-  Status map_tile_from_file_cmp(
-      int attribute_id, off_t offset, size_t tile_size);
-
-  /**
-   * Maps a variable-sized tile from the disk for an attribute into a local
-   * buffer, using memory map (mmap). This function works with any compression.
-   *
-   * @param attribute_id The id of the attribute the read occurs for.
-   * @param offset The offset at which the tile starts in the file.
-   * @param tile_size The tile size.
-   * @return TILEDB_RS_OK for success, and TILEDB_RS_ERR for error.
-   */
-  Status map_tile_from_file_var_cmp(
-      int attribute_id, off_t offset, size_t tile_size);
-
-  /**
-   * Maps a tile from the disk for an attribute into a local buffer, using
-   * memory map (mmap). This function focuses on the case of no compression.
-   *
-   * @param attribute_id The id of the attribute the read occurs for.
-   * @param offset The offset at which the tile starts in the file.
-   * @param tile_size The tile size.
-   * @return TILEDB_RS_OK for success, and TILEDB_RS_ERR for error.
-   */
-  Status map_tile_from_file_cmp_none(
-      int attribute_id, off_t offset, size_t tile_size);
-
-  /**
-   * Maps a variable-sized tile from the disk for an attribute into a local
-   * buffer, using memory map (mmap). This function focuses on the case of
-   * no compression.
-   *
-   * @param attribute_id The id of the attribute the read occurs for.
-   * @param offset The offset at which the tile starts in the file.
-   * @param tile_size The tile size.
-   * @return TILEDB_RS_OK for success, and TILEDB_RS_ERR for error.
-   */
-  Status map_tile_from_file_var_cmp_none(
-      int attribute_id, off_t offset, size_t tile_size);
-
-#ifdef HAVE_MPI
-  /**
-   * Reads a tile from the disk for an attribute into a local buffer, using
-   * MPI-IO. This function focuses on the case of GZIP compression.
-   *
-   * @param attribute_id The id of the attribute the read occurs for.
-   * @param offset The offset at which the tile starts in the file.
-   * @param tile_size The tile size.
-   * @return TILEDB_RS_OK for success, and TILEDB_RS_ERR for error.
-   */
-  Status mpi_io_read_tile_from_file_cmp(
-      int attribute_id, off_t offset, size_t tile_size);
-
-  /**
-   * Reads a variable-sized tile from the disk for an attribute into a local
-   * buffer, using MPI-IO. This function focuses on the case of any
-   * compression.
-   *
-   * @param attribute_id The id of the attribute the read occurs for.
-   * @param offset The offset at which the tile starts in the file.
-   * @param tile_size The tile size.
-   * @return TILEDB_RS_OK for success, and TILEDB_RS_ERR for error.
-   */
-  Status mpi_io_read_tile_from_file_var_cmp(
-      int attribute_id, off_t offset, size_t tile_size);
-#endif
-
-  /**
-   * Prepares a tile from the disk for reading for an attribute.
-   *
-   * @param attribute_id The id of the attribute the tile is prepared for.
-   * @param tile_i The tile position on the disk.
-   * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
-   */
-  Status prepare_tile_for_reading(int attribute_id, int64_t tile_i);
+  Status read_tile(int attribute_id, int64_t tile_i);
 
   /**
    * Prepares a variable-sized tile from the disk for reading for an attribute.
@@ -797,50 +734,7 @@ class ReadState {
    * @param tile_i The tile position on the disk.
    * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
    */
-  Status prepare_tile_for_reading_var(int attribute_id, int64_t tile_i);
-
-  /**
-   * Prepares a tile from the disk for reading for an attribute.
-   * This function focuses on the case there is any compression.
-   *
-   * @param attribute_id The id of the attribute the tile is prepared for.
-   * @param tile_i The tile position on the disk.
-   * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
-   */
-  Status prepare_tile_for_reading_cmp(int attribute_id, int64_t tile_i);
-
-  /**
-   * Prepares a tile from the disk for reading for an attribute.
-   * This function focuses on the case there is no compression.
-   *
-   * @param attribute_id The id of the attribute the tile is prepared for.
-   * @param tile_i The tile position on the disk.
-   * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
-   */
-  Status prepare_tile_for_reading_cmp_none(int attribute_id, int64_t tile_i);
-
-  /**
-   * Prepares a tile from the disk for reading for an attribute.
-   * This function focuses on the case of variable-sized tiles with any
-   * compression.
-   *
-   * @param attribute_id The id of the attribute the tile is prepared for.
-   * @param tile_i The tile position on the disk.
-   * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
-   */
-  Status prepare_tile_for_reading_var_cmp(int attribute_id, int64_t tile_i);
-
-  /**
-   * Prepares a tile from the disk for reading for an attribute.
-   * This function focuses on the case of variable-sized tiles with no
-   * compression.
-   *
-   * @param attribute_id The id of the attribute the tile is prepared for.
-   * @param tile_i The tile position on the disk.
-   * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
-   */
-  Status prepare_tile_for_reading_var_cmp_none(
-      int attribute_id, int64_t tile_i);
+  Status read_tile_var(int attribute_id, int64_t tile_i);
 
   /**
    * Reads data from an attribute tile into an input buffer.
@@ -867,50 +761,6 @@ class ReadState {
    */
   Status READ_FROM_TILE_VAR(
       int attribute_id, void* buffer, size_t tile_offset, size_t bytes_to_copy);
-
-  /**
-   * Reads a tile from the disk for an attribute into a local buffer. This
-   * function focuses on the case there is any compression.
-   *
-   * @param attribute_id The id of the attribute the read occurs for.
-   * @param offset The offset at which the tile starts in the file.
-   * @param tile_size The tile size.
-   * @return TILEDB_RS_OK for success, and TILEDB_RS_ERR for error.
-   */
-  Status read_tile_from_file_cmp(
-      int attribute_id, off_t offset, size_t tile_size);
-
-  /**
-   * Reads a tile from the disk for an attribute into a local buffer. This
-   * function focuses on the case of variable-sized tiles and any compression.
-   *
-   * @param attribute_id The id of the attribute the read occurs for.
-   * @param offset The offset at which the tile starts in the file.
-   * @param tile_size The tile size.
-   * @return TILEDB_RS_OK for success, and TILEDB_RS_ERR for error.
-   */
-  Status read_tile_from_file_var_cmp(
-      int attribute_id, off_t offset, size_t tile_size);
-
-  /**
-   * Saves in the read state the file offset for an attribute tile.
-   * This will be used in subsequent read requests.
-   *
-   * @param attribute_id The id of the attribute the read occurs for.
-   * @param offset The offset at which the tile starts in the file.
-   * @return void
-   */
-  void set_tile_file_offset(int attribute_id, off_t offset);
-
-  /**
-   * Saves in the read state the file offset for a variable-sized attribute
-   * tile. This will be used in subsequent read requests.
-   *
-   * @param attribute_id The id of the attribute the read occurs for.
-   * @param offset The offset at which the tile starts in the file.
-   * @return void
-   */
-  void set_tile_var_file_offset(int attribute_id, off_t offset);
 
   /**
    * Shifts the offsets stored in the tile buffer of the input attribute, such
