@@ -60,6 +60,8 @@ class TileIO {
       uint64_t compressed_size,
       uint64_t tile_size);
 
+  Status read_from_tile(Tile* tile, void* buffer, uint64_t bytes);
+
   Status write(Tile* tile, uint64_t* bytes_written);
 
  private:
@@ -92,6 +94,18 @@ class TileIO {
   Status compress_tile_bzip2(Tile* tile, int level);
 
   Status decompress_tile(Tile* tile, uint64_t tile_size);
+
+  Status decompress_tile_gzip(Tile* tile, uint64_t tile_size);
+
+    Status decompress_tile_zstd(Tile* tile, uint64_t tile_size);
+
+    Status decompress_tile_lz4(Tile* tile, uint64_t tile_size);
+
+    Status decompress_tile_blosc(Tile* tile, uint64_t tile_size);
+
+    Status decompress_tile_rle(Tile* tile, uint64_t tile_size);
+
+    Status decompress_tile_bzip2(Tile* tile, uint64_t tile_size);
 
   Status map_tile(Tile* tile, uint64_t tile_size, uint64_t offset);
 

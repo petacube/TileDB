@@ -33,11 +33,11 @@
 #include "buffer.h"
 #include "logger.h"
 
+#include <sys/mman.h>
+#include <unistd.h>
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
-#include <sys/mman.h>
-#include <unistd.h>
 
 namespace tiledb {
 
@@ -65,7 +65,7 @@ Buffer::Buffer(uint64_t size) {
 
 Buffer::~Buffer() {
   Status st = clear();
-  if(!st.ok())
+  if (!st.ok())
     LOG_STATUS(st);
 }
 
@@ -76,8 +76,8 @@ Buffer::~Buffer() {
 Status Buffer::clear() {
   offset_ = 0;
 
-  if(data_ != nullptr) {
-    if(!mmap_data_) {
+  if (data_ != nullptr) {
+    if (!mmap_data_) {
       free(data_);
       data_ = nullptr;
       size_ = 0;
@@ -119,7 +119,7 @@ Status Buffer::mmap(int fd, uint64_t size, uint64_t offset, bool read_only) {
 }
 
 Status Buffer::munmap() {
-  if(mmap_data_ == nullptr)
+  if (mmap_data_ == nullptr)
     return Status::Ok();
 
   if (::munmap(mmap_data_, mmap_size_))
@@ -129,6 +129,16 @@ Status Buffer::munmap() {
   mmap_size_ = 0;
   data_ = nullptr;
   size_ = 0;
+
+  return Status::Ok();
+}
+
+Status Buffer::read(void* buffer, uint64_t bytes) {
+  if(bytes + offset_ > size_)
+    return LOG_STATUS(Status::BufferError("Read failed; Trying to read beyond buffer size"));
+
+  memcpy(buffer, (char*) data_ + offset_, bytes);
+  offset_ += bytes;
 
   return Status::Ok();
 }

@@ -46,7 +46,7 @@ Tile::Tile() {
   cell_size_ = 0;
   compressor_ = Compressor::NO_COMPRESSION;
   compression_level_ = -1;
-  file_offset_ = 0; // TODO: perhaps initialize to -1
+  file_offset_ = 0;  // TODO: perhaps initialize to -1
   stores_offsets_ = false;
   tile_size_ = 0;
   type_ = Datatype::INT32;
@@ -66,27 +66,39 @@ Tile::Tile(
     , tile_size_(tile_size)
     , type_(type) {
   buffer_ = nullptr;
-  file_offset_ = 0; // TODO: perhaps initialize to -1
+  file_offset_ = 0;  // TODO: perhaps initialize to -1
 }
 
 Tile::~Tile() {
-  if (buffer_ != nullptr)
-    delete buffer_;
+  delete buffer_;
 }
 
 /* ****************************** */
 /*               API              */
 /* ****************************** */
 
-Status Tile::mmap(int fd, uint64_t tile_size, uint64_t offset) {
-  // Create new buffer
-  if (buffer_ != nullptr)
-    delete buffer_;
-  buffer_ = new Buffer();
-
-  return buffer_->mmap(fd, tile_size, offset, !stores_offsets_);
+// TODO: return status
+void Tile::alloc() {
+  if(buffer_ == nullptr)
+    buffer_ = new Buffer(tile_size_);
 }
 
+Status Tile::mmap(int fd, uint64_t tile_size, uint64_t offset) {
+  // Create new buffer
+  delete buffer_;
+  buffer_ = new Buffer();
+
+  Status st = buffer_->mmap(fd, tile_size, offset, !stores_offsets_);
+
+  if(st.ok())
+    tile_size_ = tile_size;
+
+  return st;
+}
+
+Status Tile::read(void* buffer, uint64_t bytes) {
+  return buffer_->read(buffer, bytes);
+}
 
 Status Tile::write(ConstBuffer* const_buffer) {
   if (buffer_ == nullptr)

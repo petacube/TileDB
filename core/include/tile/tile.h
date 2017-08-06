@@ -64,12 +64,14 @@ class Tile {
   /*                API                */
   /* ********************************* */
 
-  inline void* data() const {
-    return buffer_->data();
+  inline void advance_offset(uint64_t bytes) {
+    buffer_->advance_offset(bytes);
   }
 
-  inline uint64_t offset() const {
-    return (buffer_ == nullptr) ? 0 : buffer_->offset();
+  void alloc();
+
+  inline void* data() const {
+    return buffer_->data();
   }
 
   inline uint64_t cell_size() const {
@@ -88,11 +90,25 @@ class Tile {
     return buffer_ == nullptr || buffer_->offset() == 0;
   }
 
+  inline uint64_t file_offset() const {
+    return file_offset_;
+  }
+
   inline bool full() const {
     return buffer_->offset() == buffer_->size();
   }
 
+  inline bool in_mem() const {
+    return buffer_ != nullptr;
+  }
+
+    inline uint64_t offset() const {
+      return (buffer_ == nullptr) ? 0 : buffer_->offset();
+    }
+
   Status mmap(int fd, uint64_t tile_size, uint64_t offset);
+
+    Status read(void* buffer, uint64_t bytes);
 
   inline void reset() {
     if (buffer_ != nullptr)
@@ -101,6 +117,14 @@ class Tile {
 
   void set_file_offset(uint64_t file_offset) {
     file_offset_ = file_offset;
+  }
+
+  void set_offset(uint64_t offset) {
+    buffer_->set_offset(offset);
+  }
+
+  inline uint64_t size() const {
+      return tile_size_;
   }
 
   inline Datatype type() const {

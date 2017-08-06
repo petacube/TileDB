@@ -372,27 +372,6 @@ class ReadState {
    */
   void* last_tile_coords_;
 
-  /** A buffer for each attribute used by mmap for mapping a tile from disk. */
-  //  std::vector<void*> map_addr_;
-
-  /** The corresponding lengths of the buffers in map_addr_. */
-  //  std::vector<size_t> map_addr_lengths_;
-
-  /** A buffer mapping a compressed tile from disk. */
-  //  void* map_addr_compressed_;
-
-  /** The corresponding length of the map_addr_compressed_ buffer. */
-  //  size_t map_addr_compressed_length_;
-
-  /**
-   * A buffer for each attribute used by mmap for mapping a variable tile from
-   * disk.
-   */
-  //  std::vector<void*> map_addr_var_;
-
-  /** The corresponding lengths of the buffers in map_addr_var_. */
-  //  std::vector<size_t> map_addr_var_lengths_;
-
   /**
    * The overlap between an MBR and the current tile under investigation
    * in the case of **sparse** fragments in **dense** arrays. The overlap
@@ -429,18 +408,6 @@ class ReadState {
    */
   bool subarray_area_covered_;
 
-  /** Internal buffer used in the case of compression. */
-  //  void* tile_compressed_;
-
-  /** Allocated size for internal buffer used in the case of compression. */
-  //  size_t tile_compressed_allocated_size_;
-
-  /** File offset for each attribute tile. */
-  //  std::vector<off_t> tiles_file_offsets_;
-
-  /** File offset for each variable-sized attribute tile. */
-  //  std::vector<off_t> tiles_var_file_offsets_;
-
   /**
    * Local tile buffers, one per attribute, plus two for coordinates
    * (the second one is for searching).
@@ -449,8 +416,7 @@ class ReadState {
 
   std::vector<Tile*> Tiles_;
 
-  /** Current offsets in tiles_ (one per attribute). */
-  //  std::vector<size_t> tiles_offsets_;
+  std::vector<Tile*> Tiles_var_;
 
   /**
    * The tile position range the search for overlapping tiles with the
@@ -458,26 +424,11 @@ class ReadState {
    */
   int64_t tile_search_range_[2];
 
-  /** Sizes of tiles_ (one per attribute). */
-  //  std::vector<size_t> tiles_sizes_;
-
-  /** Local variable tile buffers (one per attribute). */
-  //  std::vector<void*> tiles_var_;
-
-  /** Allocated sizes for the local variable tile buffers. */
-  //  std::vector<size_t> tiles_var_allocated_size_;
-
-  /** Current offsets in tiles_var_ (one per attribute). */
-  //  std::vector<size_t> tiles_var_offsets_;
-
-  /** Sizes of tiles_var_ (one per attribute). */
-  //  std::vector<size_t> tiles_var_sizes_;
-
   /** Temporary coordinates. */
   void* tmp_coords_;
 
   /** Temporary offset. */
-  size_t tmp_offset_;
+  uint64_t tmp_offset_;
 
   /* ********************************* */
   /*          PRIVATE METHODS          */
@@ -492,8 +443,8 @@ class ReadState {
    * @return 1 if the compared data are equal, 0 if they are not equal and
    *     TILEDB_RS_ERR for error.
    */
-  Status CMP_COORDS_TO_SEARCH_TILE(
-      const void* buffer, size_t tile_offset, bool& isequal);
+  Status cmp_coords_to_search_tile(
+      const void* buffer, uint64_t tile_offset, bool& isequal);
 
   /**
    * Computes the number of bytes to copy from the local tile buffers of a given
@@ -520,10 +471,10 @@ class ReadState {
       int attribute_id,
       int64_t start_cell_pos,
       int64_t& end_cell_pos,
-      size_t buffer_free_space,
-      size_t buffer_var_free_space,
-      size_t& bytes_to_copy,
-      size_t& bytes_var_to_copy);
+      uint64_t buffer_free_space,
+      uint64_t buffer_var_free_space,
+      uint64_t& bytes_to_copy,
+      uint64_t& bytes_var_to_copy);
 
   /**
    * Computes the ranges of tile positions that need to be searched for finding
@@ -553,115 +504,6 @@ class ReadState {
    */
   template <class T>
   void compute_tile_search_range_col_or_row();
-
-  /**
-   * Decompresses a tile with GZIP.
-   *
-   * @param attribute_id The attribute id.
-   * @param tile_compressed The compressed tile to be decompressed.
-   * @param tile_compressed_size The size of the compressed tile.
-   * @param tile The resulting decompressed tile.
-   * @param tile_size The expected size of the decompressed tile (for checking
-   *     for errors).
-   * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
-   */
-  Status decompress_tile_gzip(
-      int attribute_id,
-      unsigned char* tile_compressed,
-      size_t tile_compressed_size,
-      unsigned char* tile,
-      size_t tile_size);
-
-  /**
-   * Decompresses a tile with Zstandard.
-   *
-   * @param attribute_id The attribute id.
-   * @param tile_compressed The compressed tile to be decompressed.
-   * @param tile_compressed_size The size of the compressed tile.
-   * @param tile The resulting decompressed tile.
-   * @param tile_size The expected size of the decompressed tile (for checking
-   *     for errors).
-   * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
-   */
-  Status decompress_tile_zstd(
-      int attribute_id,
-      unsigned char* tile_compressed,
-      size_t tile_compressed_size,
-      unsigned char* tile,
-      size_t tile_size);
-
-  /**
-   * Decompresses a tile with LZ4.
-   *
-   * @param attribute_id The attribute id.
-   * @param tile_compressed The compressed tile to be decompressed.
-   * @param tile_compressed_size The size of the compressed tile.
-   * @param tile The resulting decompressed tile.
-   * @param tile_size The expected size of the decompressed tile (for checking
-   *     for errors).
-   * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
-   */
-  Status decompress_tile_lz4(
-      int attribute_id,
-      unsigned char* tile_compressed,
-      size_t tile_compressed_size,
-      unsigned char* tile,
-      size_t tile_size);
-
-  /**
-   * Decompresses a tile with Blosc.
-   *
-   * @param attribute_id The attribute id.
-   * @param tile_compressed The compressed tile to be decompressed.
-   * @param tile_compressed_size The size of the compressed tile.
-   * @param tile The resulting decompressed tile.
-   * @param tile_size The expected size of the decompressed tile (for checking
-   *     for errors).
-   * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
-   */
-  Status decompress_tile_blosc(
-      int attribute_id,
-      unsigned char* tile_compressed,
-      size_t tile_compressed_size,
-      unsigned char* tile,
-      size_t tile_size);
-
-  /**
-   * Decompresses a tile with RLE.
-   *
-   * @param attribute_id The id of the attribute the tile belongs to.
-   * @param tile_compressed The compressed tile to be decompressed.
-   * @param tile_compressed_size The size of the compressed tile.
-   * @param tile The resulting decompressed tile.
-   * @param tile_size The expected size of the decompressed tile (for checking
-   *     for errors).
-   * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
-   */
-  Status decompress_tile_rle(
-      int attribute_id,
-      uint64_t value_size,
-      unsigned char* tile_compressed,
-      size_t tile_compressed_size,
-      unsigned char* tile,
-      size_t tile_size);
-
-  /**
-   * Decompresses a tile with BZIP2.
-   *
-   * @param attribute_id The attribute id.
-   * @param tile_compressed The compressed tile to be decompressed.
-   * @param tile_compressed_size The size of the compressed tile.
-   * @param tile The resulting decompressed tile.
-   * @param tile_size The expected size of the decompressed tile (for checking
-   *     for errors).
-   * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
-   */
-  Status decompress_tile_bzip2(
-      int attribute_id,
-      unsigned char* tile_compressed,
-      size_t tile_compressed_size,
-      unsigned char* tile,
-      size_t tile_size);
 
   /**
    * Returns the cell position in the search tile that is after the
@@ -708,7 +550,7 @@ class ReadState {
    * @param coords The destination pointer.
    * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
    */
-  Status GET_COORDS_PTR_FROM_SEARCH_TILE(int64_t i, const void*& coords);
+  Status get_coords_from_search_tile(int64_t i, const void*& coords);
 
   /**
    * Retrieves the pointer of the i-th cell in the offset tile of a
@@ -719,11 +561,12 @@ class ReadState {
    * @param offset The destination pointer.
    * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
    */
-  Status GET_CELL_PTR_FROM_OFFSET_TILE(
-      int attribute_id, int64_t i, const size_t*& offset);
+  Status get_offset(int attribute_id, int64_t i, const uint64_t*& offset);
 
   /** Returns *true* if the file of the input attribute is empty. */
   bool is_empty_attribute(int attribute_id) const;
+
+  Status read_from_tile(int attribute_id, void* buffer, uint64_t tile_offset, uint64_t bytes);
 
   Status read_tile(int attribute_id, int64_t tile_i);
 
@@ -735,32 +578,6 @@ class ReadState {
    * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
    */
   Status read_tile_var(int attribute_id, int64_t tile_i);
-
-  /**
-   * Reads data from an attribute tile into an input buffer.
-   *
-   * @param attribute_id The attribute id.
-   * @param buffer The destination buffer.
-   * @param tile_offset The offset in the tile where the read starts from.
-   * @param bytes_to_copy The number of bytes to copy from the tile into the
-   *     buffer.
-   * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
-   */
-  Status READ_FROM_TILE(
-      int attribute_id, void* buffer, size_t tile_offset, size_t bytes_to_copy);
-
-  /**
-   * Reads data from a variable-sized attribute tile into an input buffer.
-   *
-   * @param attribute_id The attribute id.
-   * @param buffer The destination buffer.
-   * @param tile_offset The offset in the tile where the read starts from.
-   * @param bytes_to_copy The number of bytes to copy from the tile into the
-   *     buffer.
-   * @return TILEDB_RS_OK for success and TILEDB_RS_ERR for error.
-   */
-  Status READ_FROM_TILE_VAR(
-      int attribute_id, void* buffer, size_t tile_offset, size_t bytes_to_copy);
 
   /**
    * Shifts the offsets stored in the tile buffer of the input attribute, such
@@ -783,7 +600,7 @@ class ReadState {
    * @return void.
    */
   void shift_var_offsets(
-      void* buffer, int64_t offset_num, size_t new_start_offset);
+      void* buffer, int64_t offset_num, uint64_t new_start_offset);
 };
 
 }  // namespace tiledb

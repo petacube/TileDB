@@ -108,7 +108,36 @@ Status TileIO::read(
   // Decompress tile
   // TODO: here we will put all other filters, and potentially employ chunking
   // TODO: choose the proper buffer based on all filters, not just compression
-  RETURN_NOT_OK(decompress_tile(tile, tile_size));
+  return decompress_tile(tile, tile_size);
+}
+
+Status TileIO::read_from_tile(Tile* tile, void* buffer, uint64_t bytes) {
+  IOMethod read_method = config_->read_method();
+  if (read_method == IOMethod::READ) {
+    return filesystem::read_from_file(
+        attr_filename_.to_string(),
+        tile->file_offset() + tile->offset(),
+        buffer,
+        bytes);
+      tile->advance_offset(bytes);
+  } else if (read_method == IOMethod::MPI) {
+#ifdef HAVE_MPI
+    return filesystem::mpi_io_read_from_file(
+        config_->mpi_comm(),
+        attr_filename_.to_string(),
+        tile->file_offset() + tile->offset(),
+        buffer,
+        bytes);
+      tile->advance_offset(bytes);
+#else
+    // Error: MPI not supported
+    return LOG_STATUS(
+        Status::TileIOError("Cannot read from tile; MPI not supported"));
+#endif
+  } else {
+    return LOG_STATUS(
+            Status::TileIOError("Cannot read from tile; unknown read method"));
+  }
 }
 
 Status TileIO::write(Tile* tile, uint64_t* bytes_written) {
@@ -352,20 +381,22 @@ Status TileIO::compress_tile_bzip2(Tile* tile, int level) {
   return Status::Ok();
 }
 
-Status TileIO::decompress_tile(Tile* tile, uint64_t tile_size {
+Status TileIO::decompress_tile(Tile* tile, uint64_t tile_size) {
   // For easy reference
   Compressor compression = tile->compressor();
 
+  if(compression != Compressor::NO_COMPRESSION)
+    tile->alloc();
+
   switch (compression) {
+    case Compressor::NO_COMPRESSION:
+      return Status::Ok();
     case Compressor::GZIP:
-      return decompress_tile_gzip(
-          attribute_id, tile_compressed, tile_compressed_size, tile, tile_size);
+      return decompress_tile_gzip(tile, tile_size);
     case Compressor::ZSTD:
-      return decompress_tile_zstd(
-          attribute_id, tile_compressed, tile_compressed_size, tile, tile_size);
+      return decompress_tile_zstd(tile, tile_size);
     case Compressor::LZ4:
-      return decompress_tile_lz4(
-          attribute_id, tile_compressed, tile_compressed_size, tile, tile_size);
+      return decompress_tile_lz4(tile, tile_size);
     case Compressor::BLOSC:
 #undef BLOSC_LZ4
     case Compressor::BLOSC_LZ4:
@@ -377,70 +408,35 @@ Status TileIO::decompress_tile(Tile* tile, uint64_t tile_size {
     case Compressor::BLOSC_ZLIB:
 #undef BLOSC_ZSTD
     case Compressor::BLOSC_ZSTD:
-      return decompress_tile_blosc(
-          attribute_id, tile_compressed, tile_compressed_size, tile, tile_size);
+      return decompress_tile_blosc(tile, tile_size);
     case Compressor::RLE:
-      return decompress_tile_rle(
-          attribute_id,
-          cell_size,
-          tile_compressed,
-          tile_compressed_size,
-          tile,
-          tile_size);
+      return decompress_tile_rle(tile, tile_size);
     case Compressor::BZIP2:
-      return decompress_tile_bzip2(
-          attribute_id, tile_compressed, tile_compressed_size, tile, tile_size);
-    case Compressor::NO_COMPRESSION:
-      return Status::Ok();
+      return decompress_tile_bzip2(tile, tile_size);
   }
 }
 
- Status ReadState::decompress_tile_gzip(
-    int attribute_id,
-    unsigned char* tile_compressed,
-    size_t tile_compressed_size,
-    unsigned char* tile,
-    size_t tile_size) {
-  // For easy reference
-  const ArraySchema* array_schema = fragment_->array()->array_schema();
-  int dim_num = array_schema->dim_num();
-  int attribute_num = array_schema->attribute_num();
-  bool coords = (attribute_id == attribute_num);
-  size_t coords_size = array_schema->coords_size();
-
-  // Decompress tile
-  size_t out_size = 0;
+Status TileIO::decompress_tile_gzip(Tile* tile, uint64_t tile_size) {
+  size_t out_size = 0;  // TODO: this will change
   RETURN_NOT_OK(GZip::decompress(
-      array_schema->type_size(attribute_id),
-      tile_compressed,
-      tile_compressed_size,
-      tile,
+      utils::datatype_size(tile->type()),
+      buffer_->data(),
+      buffer_->size(),
+      tile->data(),
       tile_size,
       &out_size));
+
 
   return Status::Ok();
 }
 
-Status ReadState::decompress_tile_zstd(
-    int attribute_id,
-    unsigned char* tile_compressed,
-    size_t tile_compressed_size,
-    unsigned char* tile,
-    size_t tile_size) {
-  // For easy reference
-  const ArraySchema* array_schema = fragment_->array()->array_schema();
-  int dim_num = array_schema->dim_num();
-  int attribute_num = array_schema->attribute_num();
-  bool coords = (attribute_id == attribute_num);
-  size_t coords_size = array_schema->coords_size();
-
-  // Decompress tile
-  size_t out_size = 0;
+Status TileIO::decompress_tile_zstd(Tile* tile, uint64_t tile_size) {
+  size_t out_size = 0;  // TODO: this will change
   RETURN_NOT_OK(ZStd::decompress(
-      array_schema->type_size(attribute_id),
-      tile_compressed,
-      tile_compressed_size,
-      tile,
+      utils::datatype_size(tile->type()),
+      buffer_->data(),
+      buffer_->size(),
+      tile->data(),
       tile_size,
       &out_size));
 
@@ -448,25 +444,13 @@ Status ReadState::decompress_tile_zstd(
   return Status::Ok();
 }
 
-Status ReadState::decompress_tile_lz4(
-    int attribute_id,
-    unsigned char* tile_compressed,
-    size_t tile_compressed_size,
-    unsigned char* tile,
-    size_t tile_size) {
-  // For easy reference
-  const ArraySchema* array_schema = fragment_->array()->array_schema();
-  int dim_num = array_schema->dim_num();
-  int attribute_num = array_schema->attribute_num();
-  bool coords = (attribute_id == attribute_num);
-  size_t coords_size = array_schema->coords_size();
-
-  size_t out_size = 0;
+Status TileIO::decompress_tile_lz4(Tile* tile, uint64_t tile_size) {
+  size_t out_size = 0;  // TODO: this will change
   RETURN_NOT_OK(LZ4::decompress(
-      array_schema->type_size(attribute_id),
-      tile_compressed,
-      tile_compressed_size,
-      tile,
+      utils::datatype_size(tile->type()),
+      buffer_->data(),
+      buffer_->size(),
+      tile->data(),
       tile_size,
       &out_size));
 
@@ -474,25 +458,13 @@ Status ReadState::decompress_tile_lz4(
   return Status::Ok();
 }
 
-Status ReadState::decompress_tile_blosc(
-    int attribute_id,
-    unsigned char* tile_compressed,
-    size_t tile_compressed_size,
-    unsigned char* tile,
-    size_t tile_size) {
-  // For easy reference
-  const ArraySchema* array_schema = fragment_->array()->array_schema();
-  int dim_num = array_schema->dim_num();
-  int attribute_num = array_schema->attribute_num();
-  bool coords = (attribute_id == attribute_num);
-  size_t coords_size = array_schema->coords_size();
-
-  size_t out_size = 0;
+Status TileIO::decompress_tile_blosc(Tile* tile, uint64_t tile_size) {
+  size_t out_size = 0;  // TODO: this will change
   RETURN_NOT_OK(Blosc::decompress(
-      array_schema->type_size(attribute_id),
-      tile_compressed,
-      tile_compressed_size,
-      tile,
+      utils::datatype_size(tile->type()),
+      buffer_->data(),
+      buffer_->size(),
+      tile->data(),
       tile_size,
       &out_size));
 
@@ -500,129 +472,68 @@ Status ReadState::decompress_tile_blosc(
   return Status::Ok();
 }
 
-Status ReadState::decompress_tile_rle(
-    int attribute_id,
-    uint64_t value_size,
-    unsigned char* tile_compressed,
-    size_t tile_compressed_size,
-    unsigned char* tile,
-    size_t tile_size) {
-  // Decompress tile
-  Status st;
-  size_t out_size;
-  st = RLE::decompress(
-      value_size,
-      tile_compressed,
-      tile_compressed_size,
-      tile,
+Status TileIO::decompress_tile_rle(Tile* tile, uint64_t tile_size) {
+  size_t out_size = 0;  // TODO: this will change
+  RETURN_NOT_OK(RLE::decompress(
+      tile->cell_size(),
+      buffer_->data(),
+      buffer_->size(),
+      tile->data(),
       tile_size,
-      &out_size);
+      &out_size));
 
-  return st;
+  // Success
+  return Status::Ok();
 }
 
-Status ReadState::decompress_tile_bzip2(
-    int attribute_id,
-    unsigned char* tile_compressed,
-    size_t tile_compressed_size,
-    unsigned char* tile,
-    size_t tile_size) {
-  // For easy reference
-  const ArraySchema* array_schema = fragment_->array()->array_schema();
-  int dim_num = array_schema->dim_num();
-  int attribute_num = array_schema->attribute_num();
-  bool coords = (attribute_id == attribute_num);
-  size_t coords_size = array_schema->coords_size();
-
-  // Decompress tile
-  size_t out_size = 0;
+Status TileIO::decompress_tile_bzip2(Tile* tile, uint64_t tile_size) {
+  size_t out_size = 0;  // TODO: this will change
   RETURN_NOT_OK(BZip::decompress(
-      array_schema->type_size(attribute_id),
-      tile_compressed,
-      tile_compressed_size,
-      tile,
+      utils::datatype_size(tile->type()),
+      buffer_->data(),
+      buffer_->size(),
+      tile->data(),
       tile_size,
       &out_size));
 
   return Status::Ok();
 }
 
- Status TileIO::map_tile(Tile* tile, uint64_t tile_size, uint64_t offset) {
+Status TileIO::map_tile(Tile* tile, uint64_t tile_size, uint64_t offset) {
   // TODO: this probably will not work with anything non-POSIX
   // Open file
   int fd = open(attr_filename_.c_str(), O_RDONLY);
-  if(fd == -1)
+  if (fd == -1)
     return LOG_STATUS(
-            Status::TileIOError("Cannot map tile; File opening error"));
+        Status::TileIOError("Cannot map tile; File opening error"));
 
   RETURN_NOT_OK_ELSE(tile->mmap(fd, tile_size, offset), close(fd));
 
   // Close file
   if (close(fd))
     return LOG_STATUS(
-            Status::TileIOError("Cannot map tile; File closing error"));
+        Status::TileIOError("Cannot map tile; File closing error"));
 
   // Success
   return Status::Ok();
 }
 
- Status TileIO::map_tile(uint64_t tile_size, uint64_t offset) {
+Status TileIO::map_tile(uint64_t tile_size, uint64_t offset) {
   // TODO: this probably will not work with anything non-POSIX
-  // Unmap
-  if (map_addr_compressed_ != nullptr) {
-    if (munmap(map_addr_compressed_, map_addr_compressed_length_)) {
-      return LOG_STATUS(Status::MMapError(
-          "Cannot read tile from file with map; Memory unmap error"));
-    }
-  }
-
-  // Calculate offset considering the page size
-  size_t page_size = sysconf(_SC_PAGE_SIZE);
-  off_t start_offset = (offset / page_size) * page_size;
-  size_t extra_offset = offset - start_offset;
-  size_t new_length = tile_size + extra_offset;
-
   // Open file
-  int fd = open(filename.c_str(), O_RDONLY);
-  if (fd == -1) {
-    munmap(map_addr_compressed_, map_addr_compressed_length_);
-    map_addr_compressed_ = nullptr;
-    map_addr_compressed_length_ = 0;
-    tile_compressed_ = nullptr;
+  int fd = open(attr_filename_.c_str(), O_RDONLY);
+  if (fd == -1)
     return LOG_STATUS(
-        Status::MMapError("Cannot read tile from file; File opening error"));
-  }
+        Status::TileIOError("Cannot map tile; File opening error"));
 
-  // Map
-  map_addr_compressed_ = mmap(
-      map_addr_compressed_,
-      new_length,
-      PROT_READ,
-      MAP_SHARED,
-      fd,
-      start_offset);
-  if (map_addr_compressed_ == MAP_FAILED) {
-    map_addr_compressed_ = nullptr;
-    map_addr_compressed_length_ = 0;
-    tile_compressed_ = nullptr;
-    return LOG_STATUS(
-        Status::MMapError("Cannot read tile from file; Memory map error"));
-  }
-  map_addr_compressed_length_ = new_length;
-
-  // Set properly the compressed tile pointer
-  tile_compressed_ = static_cast<char*>(map_addr_compressed_) + extra_offset;
+  RETURN_NOT_OK_ELSE(buffer_->mmap(fd, tile_size, offset), close(fd));
 
   // Close file
-  if (close(fd)) {
-    munmap(map_addr_compressed_, map_addr_compressed_length_);
-    map_addr_compressed_ = nullptr;
-    map_addr_compressed_length_ = 0;
-    tile_compressed_ = nullptr;
+  if (close(fd))
     return LOG_STATUS(
-        Status::OSError("Cannot read tile from file; File closing error"));
-  }
+        Status::TileIOError("Cannot map tile; File closing error"));
 
+  // Success
   return Status::Ok();
 }
 

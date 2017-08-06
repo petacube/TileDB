@@ -97,7 +97,7 @@ enum class StatusCode : char {
   AIO,
   Tile,
   TileIO,
-    Buffer
+  Buffer
 };
 
 class Status {
@@ -233,10 +233,10 @@ class Status {
     return Status(StatusCode::TileIO, msg, -1);
   }
 
-    /** Return a BufferError error class Status with a given message **/
-    static Status BufferError(const std::string& msg) {
-      return Status(StatusCode::Buffer, msg, -1);
-    }
+  /** Return a BufferError error class Status with a given message **/
+  static Status BufferError(const std::string& msg) {
+    return Status(StatusCode::Buffer, msg, -1);
+  }
 
   /** Returns true iff the status indicates success **/
   bool ok() const {

@@ -153,7 +153,7 @@ std::string Status::code_to_string() const {
       break;
     case StatusCode::Buffer:
       type = "[TileDB::Buffer] Error";
-          break;
+      break;
     default:
       type = "[TileDB::?] Error:";
   }

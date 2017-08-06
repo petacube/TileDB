@@ -56,19 +56,25 @@ class Buffer {
   /*                API                */
   /* ********************************* */
 
+  void advance_offset(uint64_t bytes) {
+    offset_ += bytes;
+  }
+
   Status clear();
 
   inline void* data() const {
     return data_;
   }
 
-  Status mmap(int fd, uint64_t size, uint64_t offset, bool read_only);
+  Status mmap(int fd, uint64_t size, uint64_t offset, bool read_only = true);
 
   Status munmap();
 
   inline uint64_t offset() const {
     return offset_;
   }
+
+  Status read(void* buffer, uint64_t bytes);
 
   void realloc(uint64_t size);
 
