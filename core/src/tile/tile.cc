@@ -133,7 +133,7 @@ Status Tile::read(void* buffer, uint64_t bytes) {
   return st;
 }
 
-Status Tile::write(ConstBuffer* const_buffer) {
+Status Tile::write(ConstBuffer* buf) {
   if (buffer_ == nullptr)
     buffer_ = new Buffer(tile_size_);
 
@@ -141,13 +141,13 @@ Status Tile::write(ConstBuffer* const_buffer) {
     LOG_STATUS(
         Status::TileError("Cannot write into tile; Buffer allocation failed"));
 
-  buffer_->write(const_buffer);
+  buffer_->write(buf);
   offset_ = buffer_->offset();
 
   return Status::Ok();
 }
 
-Status Tile::write(ConstBuffer* const_buffer, uint64_t bytes) {
+Status Tile::write(ConstBuffer* buf, uint64_t bytes) {
   if (buffer_ == nullptr)
     buffer_ = new Buffer(tile_size_);
 
@@ -155,7 +155,21 @@ Status Tile::write(ConstBuffer* const_buffer, uint64_t bytes) {
     LOG_STATUS(
         Status::TileError("Cannot write into tile; Buffer allocation failed"));
 
-  buffer_->write(const_buffer, bytes);
+  buffer_->write(buf, bytes);
+  offset_ = buffer_->offset();
+
+  return Status::Ok();
+}
+
+Status Tile::write_with_shift(ConstBuffer* buf, uint64_t offset) {
+  if (buffer_ == nullptr)
+    buffer_ = new Buffer(tile_size_);
+
+  if (buffer_->size() == 0)
+    LOG_STATUS(
+        Status::TileError("Cannot write into tile; Buffer allocation failed"));
+
+  buffer_->write_with_shift(buf, offset);
   offset_ = buffer_->offset();
 
   return Status::Ok();

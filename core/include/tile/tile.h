@@ -160,6 +160,8 @@ class Tile {
 
   Status write(ConstBuffer* buf);
 
+  Status write_with_shift(ConstBuffer* buf, uint64_t offset);
+
   Status write(ConstBuffer* buf, uint64_t bytes);
 
  private:

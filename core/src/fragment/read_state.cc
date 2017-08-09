@@ -83,6 +83,7 @@ ReadState::ReadState(const Fragment* fragment, BookKeeping* book_keeping)
       tiles_var_.emplace_back(
           new Tile(attr->type(), attr->compressor(), cell_size));
 
+      // TODO: call fragment URI function here instead
       attr_var_uri = fragment_uri.join_path(
           attr->name() + "_var" + Configurator::file_suffix());
       tile_io_var_.emplace_back(new TileIO(config, attr_var_uri));
@@ -421,7 +422,6 @@ Status ReadState::get_enclosing_coords(
   get_cell_pos_at_or_before(target_coords, &target_pos);
 
   // Check if target exists
-  // TODO: Check if target exists <JDFKJDFJLDFJ>
   if (target_pos >= start_pos && target_pos <= end_pos) {
     RETURN_NOT_OK(cmp_coords_to_search_tile(
         target_coords, target_pos * coords_size_, target_exists));
@@ -501,7 +501,7 @@ Status ReadState::get_fragment_cell_ranges_dense(
   int dim_num = array_schema_->dim_num();
   Layout cell_order = array_schema_->cell_order();
   size_t cell_range_size = 2 * coords_size_;
-  const T* search_tile_overlap_subarray =
+  auto search_tile_overlap_subarray =
       static_cast<const T*>(search_tile_overlap_subarray_);
   FragmentInfo fragment_info = FragmentInfo(fragment_i, search_tile_pos_);
 
@@ -518,7 +518,7 @@ Status ReadState::get_fragment_cell_ranges_dense(
     fragment_cell_ranges.emplace_back(fragment_info, cell_range);
   } else {  // Non-contiguous cells, multiple ranges
     // Initialize the coordinates at the beginning of the global range
-    T* coords = new T[dim_num];
+    auto coords = new T[dim_num];
     for (int i = 0; i < dim_num; ++i)
       coords[i] = search_tile_overlap_subarray[2 * i];
 
@@ -595,12 +595,12 @@ Status ReadState::get_fragment_cell_ranges_sparse(
 
   // For easy reference
   int dim_num = array_schema_->dim_num();
-  const T* search_tile_overlap_subarray =
+  auto search_tile_overlap_subarray =
       static_cast<const T*>(search_tile_overlap_subarray_);
 
   // Create start and end coordinates for the overlap
-  T* start_coords = new T[dim_num];
-  T* end_coords = new T[dim_num];
+  auto start_coords = new T[dim_num];
+  auto end_coords = new T[dim_num];
   for (int i = 0; i < dim_num; ++i) {
     start_coords[i] = search_tile_overlap_subarray[2 * i];
     end_coords[i] = search_tile_overlap_subarray[2 * i + 1];
@@ -630,7 +630,7 @@ Status ReadState::get_fragment_cell_ranges_sparse(
 
   // For easy reference
   int dim_num = array_schema_->dim_num();
-  const T* subarray = static_cast<const T*>(array_->subarray());
+  auto subarray = static_cast<const T*>(array_->subarray());
 
   // Handle full overlap
   if (search_tile_overlap_ == 1) {
@@ -727,11 +727,11 @@ void ReadState::get_next_overlapping_tile_dense(const T* tile_coords) {
 
   // For easy reference
   int dim_num = array_schema_->dim_num();
-  const T* tile_extents = static_cast<const T*>(array_schema_->tile_extents());
-  const T* array_domain = static_cast<const T*>(array_schema_->domain());
-  const T* subarray = static_cast<const T*>(array_->subarray());
-  const T* domain = static_cast<const T*>(book_keeping_->domain());
-  const T* non_empty_domain =
+  auto tile_extents = static_cast<const T*>(array_schema_->tile_extents());
+  auto array_domain = static_cast<const T*>(array_schema_->domain());
+  auto subarray = static_cast<const T*>(array_->subarray());
+  auto domain = static_cast<const T*>(book_keeping_->domain());
+  auto non_empty_domain =
       static_cast<const T*>(book_keeping_->non_empty_domain());
 
   // Compute the tile subarray
@@ -802,7 +802,7 @@ void ReadState::get_next_overlapping_tile_sparse() {
 
   // For easy reference
   const std::vector<void*>& mbrs = book_keeping_->mbrs();
-  const T* subarray = static_cast<const T*>(array_->subarray());
+  auto subarray = static_cast<const T*>(array_->subarray());
 
   // Update the search tile position
   if (search_tile_pos_ == -1)
@@ -818,7 +818,7 @@ void ReadState::get_next_overlapping_tile_sparse() {
       return;
     }
 
-    const T* mbr = static_cast<const T*>(mbrs[search_tile_pos_]);
+    auto mbr = static_cast<const T*>(mbrs[search_tile_pos_]);
     search_tile_overlap_ = array_schema_->subarray_overlap(
         subarray, mbr, static_cast<T*>(search_tile_overlap_subarray_));
 
@@ -838,12 +838,12 @@ void ReadState::get_next_overlapping_tile_sparse(const T* tile_coords) {
   // For easy reference
   int dim_num = array_schema_->dim_num();
   const std::vector<void*>& mbrs = book_keeping_->mbrs();
-  const T* subarray = static_cast<const T*>(array_->subarray());
+  auto subarray = static_cast<const T*>(array_->subarray());
 
   // Compute the tile subarray
-  T* tile_subarray = new T[2 * dim_num];
-  T* mbr_tile_overlap_subarray = new T[2 * dim_num];
-  T* tile_subarray_end = new T[dim_num];
+  auto tile_subarray = new T[2 * dim_num];
+  auto mbr_tile_overlap_subarray = new T[2 * dim_num];
+  auto tile_subarray_end = new T[dim_num];
   array_schema_->get_tile_subarray(tile_coords, tile_subarray);
   for (int i = 0; i < dim_num; ++i)
     tile_subarray_end[i] = tile_subarray[2 * i + 1];
@@ -863,7 +863,7 @@ void ReadState::get_next_overlapping_tile_sparse(const T* tile_coords) {
   } else {
     if (!memcmp(last_tile_coords_, tile_coords, coords_size_)) {
       // Advance only if the MBR does not exceed the tile
-      const T* bounding_coords = static_cast<const T*>(
+      auto bounding_coords = static_cast<const T*>(
           book_keeping_->bounding_coords()[search_tile_pos_]);
       if (array_schema_->tile_cell_order_cmp(
               &bounding_coords[dim_num], tile_subarray_end) <= 0) {
@@ -888,14 +888,14 @@ void ReadState::get_next_overlapping_tile_sparse(const T* tile_coords) {
     }
 
     // Get overlap between MBR and tile subarray
-    const T* mbr = static_cast<const T*>(mbrs[search_tile_pos_]);
+    auto mbr = static_cast<const T*>(mbrs[search_tile_pos_]);
     mbr_tile_overlap_ = array_schema_->subarray_overlap(
         tile_subarray, mbr, mbr_tile_overlap_subarray);
 
     // No overlap with the tile
     if (!mbr_tile_overlap_) {
       // Check if we need to break or continue
-      const T* bounding_coords = static_cast<const T*>(
+      auto bounding_coords = static_cast<const T*>(
           book_keeping_->bounding_coords()[search_tile_pos_]);
       if (array_schema_->tile_cell_order_cmp(
               &bounding_coords[dim_num], tile_subarray_end) > 0) {
@@ -929,7 +929,6 @@ void ReadState::get_next_overlapping_tile_sparse(const T* tile_coords) {
   delete[] tile_subarray;
   delete[] tile_subarray_end;
   delete[] mbr_tile_overlap_subarray;
-  return;
 }
 
 /* ****************************** */
@@ -986,7 +985,6 @@ Status ReadState::compute_bytes_to_copy(
     RETURN_NOT_OK(get_offset(attribute_id, end_cell_pos + 1, end_offset));
     bytes_var_to_copy = *end_offset - *start_offset;
   } else {
-    // TODO: this is wrong
     bytes_var_to_copy = tile_var_size - *start_offset;
   }
 
@@ -995,7 +993,7 @@ Status ReadState::compute_bytes_to_copy(
     // Perform binary search
     int64_t min = start_cell_pos + 1;
     int64_t max = end_cell_pos;
-    int64_t med;
+    int64_t med = min + ((max - min) / 2);
     // Invariants:
     // (tile[min-1] - tile[start_cell_pos]) < buffer_var_free_space AND
     // (tile[max+1] - tile[start_cell_pos]) > buffer_var_free_space
@@ -1232,7 +1230,7 @@ Status ReadState::get_cell_pos_at_or_after(const T* coords, int64_t* pos) {
   // Perform binary search to find the position of coords in the tile
   int64_t min = 0;
   int64_t max = cell_num - 1;
-  int64_t med;
+  int64_t med = min + ((max - min) / 2);
   int cmp;
   const void* coords_t;
   while (min <= max) {
@@ -1269,7 +1267,7 @@ Status ReadState::get_cell_pos_at_or_before(const T* coords, int64_t* end_pos) {
   // Perform binary search to find the position of coords in the tile
   int64_t min = 0;
   int64_t max = cell_num - 1;
-  int64_t med;
+  int64_t med = min + ((max - min) / 2);
   int cmp;
   const void* coords_t;
   while (min <= max) {
