@@ -35,7 +35,6 @@
 #include "tiledb.h"
 
 #include <cstdio>
-#include <mpi.h>
 
 int main(int argc, char** argv) {
   // Initialize context with the default configuration parameters
