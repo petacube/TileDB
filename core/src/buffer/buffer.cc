@@ -38,6 +38,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
 
 namespace tiledb {
 
@@ -106,6 +107,7 @@ Status Buffer::mmap(int fd, uint64_t size, uint64_t offset, bool read_only) {
   int flags = read_only ? MAP_SHARED : MAP_PRIVATE;
 
   // Map
+  // TODO: perhaps move to filesystem (along with open and fd)?
   mmap_data_ = ::mmap(mmap_data_, mmap_size_, prot, flags, fd, start_offset);
   if (mmap_data_ == MAP_FAILED) {
     size_ = 0;
@@ -122,6 +124,7 @@ Status Buffer::munmap() {
   if (mmap_data_ == nullptr)
     return Status::Ok();
 
+  // TODO: perhaps move to filesystem?
   if (::munmap(mmap_data_, mmap_size_))
     return LOG_STATUS(Status::BufferError("Memory unmap failed"));
 
@@ -134,10 +137,11 @@ Status Buffer::munmap() {
 }
 
 Status Buffer::read(void* buffer, uint64_t bytes) {
-  if(bytes + offset_ > size_)
-    return LOG_STATUS(Status::BufferError("Read failed; Trying to read beyond buffer size"));
+  if (bytes + offset_ > size_)
+    return LOG_STATUS(
+        Status::BufferError("Read failed; Trying to read beyond buffer size"));
 
-  memcpy(buffer, (char*) data_ + offset_, bytes);
+  memcpy(buffer, (char*)data_ + offset_, bytes);
   offset_ += bytes;
 
   return Status::Ok();

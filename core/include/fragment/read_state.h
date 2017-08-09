@@ -40,6 +40,7 @@
 #include "book_keeping.h"
 #include "fragment.h"
 #include "tile.h"
+#include "tile_io.h"
 
 namespace tiledb {
 
@@ -414,9 +415,13 @@ class ReadState {
    */
   //  std::vector<void*> tiles_;
 
-  std::vector<Tile*> Tiles_;
+  std::vector<Tile*> tiles_;
 
-  std::vector<Tile*> Tiles_var_;
+  std::vector<Tile*> tiles_var_;
+
+  std::vector<TileIO*> tile_io_;
+
+  std::vector<TileIO*> tile_io_var_;
 
   /**
    * The tile position range the search for overlapping tiles with the
@@ -469,6 +474,7 @@ class ReadState {
    */
   Status compute_bytes_to_copy(
       int attribute_id,
+      uint64_t tile_var_size,
       int64_t start_cell_pos,
       int64_t& end_cell_pos,
       uint64_t buffer_free_space,
@@ -566,7 +572,8 @@ class ReadState {
   /** Returns *true* if the file of the input attribute is empty. */
   bool is_empty_attribute(int attribute_id) const;
 
-  Status read_from_tile(int attribute_id, void* buffer, uint64_t tile_offset, uint64_t bytes);
+  Status read_from_tile(
+      int attribute_id, void* buffer, uint64_t tile_offset, uint64_t bytes);
 
   Status read_tile(int attribute_id, int64_t tile_i);
 

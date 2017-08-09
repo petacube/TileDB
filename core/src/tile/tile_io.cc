@@ -64,24 +64,32 @@ TileIO::~TileIO() {
 /*               API              */
 /* ****************************** */
 
+Status TileIO::file_size(off_t* size) const {
+  return filesystem::file_size(attr_filename_.to_string(), size);
+}
+
 Status TileIO::read(
     Tile* tile,
     uint64_t file_offset,
     uint64_t compressed_size,
     uint64_t tile_size) {
-  // For easy reference
+  // TODO: perhaps handle it better
+  tile->reset();
+
   Compressor compression = tile->compressor();
   IOMethod read_method = config_->read_method();
-
   if (compression == Compressor::NO_COMPRESSION) {
-    if (read_method == IOMethod::READ || read_method == IOMethod::MPI)
-      tile->set_file_offset(file_offset);
-    else if (read_method == IOMethod::MMAP)
+    if (read_method == IOMethod::MMAP || tile->stores_offsets()) {
       RETURN_NOT_OK(map_tile(tile, compressed_size, file_offset));
+    } else if (read_method == IOMethod::READ || read_method == IOMethod::MPI) {
+      tile->set_file_offset(file_offset);
+    }
   } else {
-    if (buffer_ == nullptr)
-      buffer_ = new Buffer(compressed_size);
+    delete buffer_;
+    buffer_ = new Buffer(compressed_size);
+
     if (read_method == IOMethod::READ) {
+      // TODO: consider optimizing (do not delete and new every time)
       RETURN_NOT_OK(filesystem::read_from_file(
           attr_filename_.to_string(),
           file_offset,
@@ -113,22 +121,21 @@ Status TileIO::read(
 
 Status TileIO::read_from_tile(Tile* tile, void* buffer, uint64_t bytes) {
   IOMethod read_method = config_->read_method();
+  Status st;
   if (read_method == IOMethod::READ) {
-    return filesystem::read_from_file(
+    st = filesystem::read_from_file(
         attr_filename_.to_string(),
         tile->file_offset() + tile->offset(),
         buffer,
         bytes);
-      tile->advance_offset(bytes);
   } else if (read_method == IOMethod::MPI) {
 #ifdef HAVE_MPI
-    return filesystem::mpi_io_read_from_file(
+    st = filesystem::mpi_io_read_from_file(
         config_->mpi_comm(),
         attr_filename_.to_string(),
         tile->file_offset() + tile->offset(),
         buffer,
         bytes);
-      tile->advance_offset(bytes);
 #else
     // Error: MPI not supported
     return LOG_STATUS(
@@ -136,8 +143,13 @@ Status TileIO::read_from_tile(Tile* tile, void* buffer, uint64_t bytes) {
 #endif
   } else {
     return LOG_STATUS(
-            Status::TileIOError("Cannot read from tile; unknown read method"));
+        Status::TileIOError("Cannot read from tile; unknown read method"));
   }
+
+  if (st.ok())
+    tile->advance_offset(bytes);
+
+  return st;
 }
 
 Status TileIO::write(Tile* tile, uint64_t* bytes_written) {
@@ -385,8 +397,8 @@ Status TileIO::decompress_tile(Tile* tile, uint64_t tile_size) {
   // For easy reference
   Compressor compression = tile->compressor();
 
-  if(compression != Compressor::NO_COMPRESSION)
-    tile->alloc();
+  if (compression != Compressor::NO_COMPRESSION)
+    tile->alloc(tile_size);
 
   switch (compression) {
     case Compressor::NO_COMPRESSION:
@@ -425,7 +437,6 @@ Status TileIO::decompress_tile_gzip(Tile* tile, uint64_t tile_size) {
       tile->data(),
       tile_size,
       &out_size));
-
 
   return Status::Ok();
 }

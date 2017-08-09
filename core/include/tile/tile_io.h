@@ -54,6 +54,8 @@ class TileIO {
   /*                API                */
   /* ********************************* */
 
+  Status file_size(off_t* size) const;
+
   Status read(
       Tile* tile,
       uint64_t file_offset,
@@ -97,15 +99,15 @@ class TileIO {
 
   Status decompress_tile_gzip(Tile* tile, uint64_t tile_size);
 
-    Status decompress_tile_zstd(Tile* tile, uint64_t tile_size);
+  Status decompress_tile_zstd(Tile* tile, uint64_t tile_size);
 
-    Status decompress_tile_lz4(Tile* tile, uint64_t tile_size);
+  Status decompress_tile_lz4(Tile* tile, uint64_t tile_size);
 
-    Status decompress_tile_blosc(Tile* tile, uint64_t tile_size);
+  Status decompress_tile_blosc(Tile* tile, uint64_t tile_size);
 
-    Status decompress_tile_rle(Tile* tile, uint64_t tile_size);
+  Status decompress_tile_rle(Tile* tile, uint64_t tile_size);
 
-    Status decompress_tile_bzip2(Tile* tile, uint64_t tile_size);
+  Status decompress_tile_bzip2(Tile* tile, uint64_t tile_size);
 
   Status map_tile(Tile* tile, uint64_t tile_size, uint64_t offset);
 

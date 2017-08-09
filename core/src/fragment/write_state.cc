@@ -64,20 +64,21 @@ WriteState::WriteState(const Fragment* fragment, BookKeeping* book_keeping)
   for (int i = 0; i < attribute_num + 1; ++i)
     tile_cell_num_[i] = 0;
 
+  // TODO: perhaps initialize TileIO here
+
   // Initialize tiles
   for (int i = 0; i < attribute_num; ++i) {
     const Attribute* attr = array_schema->Attributes()[i];
     bool var_size = array_schema->var_size(i);
     uint64_t cell_size =
         (var_size) ? array_schema->type_size(i) : array_schema->cell_size(i);
-    tiles_.emplace_back(
-        new Tile(
-            attr->type(),
-            attr->compressor(),
-            attr->compression_level(),
-            fragment_->tile_size(i),
-            attr->cell_size(),
-            var_size));
+    tiles_.emplace_back(new Tile(
+        attr->type(),
+        attr->compressor(),
+        attr->compression_level(),
+        fragment_->tile_size(i),
+        attr->cell_size(),
+        var_size));
     if (var_size)
       tiles_var_.emplace_back(new Tile(
           attr->type(),
