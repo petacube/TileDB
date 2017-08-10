@@ -103,6 +103,7 @@ void Tile::advance_offset(uint64_t bytes) {
 }
 
 // TODO: return status
+// TODO: avoid allocating all the time - realloc instead
 void Tile::alloc(uint64_t size) {
   delete buffer_;
   buffer_ = new Buffer(size);

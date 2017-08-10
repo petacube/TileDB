@@ -660,7 +660,6 @@ Status WriteState::write_sparse_unsorted(
   // For easy reference
   const Array* array = fragment_->array();
   const ArraySchema* array_schema = array->array_schema();
-  int attribute_num = array_schema->attribute_num();
   const std::vector<int>& attribute_ids = array->attribute_ids();
   int attribute_id_num = (int)attribute_ids.size();
 

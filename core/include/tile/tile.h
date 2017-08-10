@@ -136,6 +136,10 @@ class Tile {
     offset_ = offset;
   }
 
+  inline void set_size(uint64_t size) {
+    tile_size_ = size;
+  }
+
   inline uint64_t size() const {
     return tile_size_;
   }
